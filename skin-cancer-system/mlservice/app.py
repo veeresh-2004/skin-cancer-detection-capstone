@@ -12,6 +12,9 @@ from flask_cors import CORS
 from gradcam.gradcam_utils import compute_gradcam, overlay_gradcam
 import threading
 
+import tensorflow as tf
+tf.config.set_visible_devices([], 'GPU')
+
 # -------------------- APP SETUP --------------------
 app = Flask(__name__)
 CORS(app)
