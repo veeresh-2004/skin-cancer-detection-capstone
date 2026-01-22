@@ -1,4 +1,12 @@
-# Python virtual environment
-venv/
-__pycache__/
+# Python
+**/venv/
+**/__pycache__/
 *.pyc
+
+# ML / binaries
+*.dll
+*.pyd
+*.so
+
+# Environment
+.env

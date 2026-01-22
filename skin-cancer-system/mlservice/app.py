@@ -10,6 +10,7 @@ from clip_utils.clip_filter import is_skin_lesion
 from clip_utils.clip_stage import estimate_melanoma_stage
 from flask_cors import CORS
 from gradcam.gradcam_utils import compute_gradcam, overlay_gradcam
+import threading
 
 # -------------------- APP SETUP --------------------
 app = Flask(__name__)
@@ -25,23 +26,34 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 print("🔵 Starting ML service...")
-print("🔵 Loading model architecture...")
 
-# -------------------- LOAD MODEL SAFELY --------------------
-with open(CONFIG_PATH, "r") as f:
-    model_config = json.load(f)
+# Model globals (will be populated by background loader)
+model = None
+model_ready = False
+model_load_error = None
 
-model = tf.keras.Sequential.from_config(model_config["config"])
-model.load_weights(WEIGHTS_PATH)
+def load_model_background():
+    global model, model_ready, model_load_error
+    try:
+        print("🔵 Loading model architecture in background thread...")
+        with open(CONFIG_PATH, "r") as f:
+            model_config = json.load(f)
 
-# 🔑 BUILD MODEL (VERY IMPORTANT)
-model.build(input_shape=(None, 224, 224, 3))
-model.predict(np.zeros((1, 224, 224, 3)))
+        m = tf.keras.Sequential.from_config(model_config["config"])
+        m.load_weights(WEIGHTS_PATH)
 
-print("✅ Model loaded & built successfully")
-print(f"📋 Model has {len(model.layers)} layers")
-for i, layer in enumerate(model.layers):
-    print(f"  Layer {i}: {layer.name} - {type(layer).__name__}")
+        # Build and warm-up the model
+        m.build(input_shape=(None, 224, 224, 3))
+        m.predict(np.zeros((1, 224, 224, 3)))
+
+        model = m
+        model_ready = True
+        print("✅ Model loaded & built successfully (background)")
+        print(f"📋 Model has {len(model.layers)} layers")
+    except Exception as err:
+        model_load_error = str(err)
+        model_ready = False
+        print("❌ Failed to load model in background:", model_load_error)
 
 # -------------------- IMAGE PREPROCESS --------------------
 def preprocess_image(image_path):
@@ -55,6 +67,10 @@ def preprocess_image(image_path):
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
+        if not model_ready:
+            if model_load_error:
+                return jsonify({"error": "Model failed to load", "details": model_load_error}), 500
+            return jsonify({"error": "Model is still loading, try again shortly"}), 503
         if "image" not in request.files:
             return jsonify({"error": "No image uploaded"}), 400
 
@@ -141,12 +157,19 @@ def predict():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ML Service is running", "model_loaded": True})
+    return jsonify({
+        "status": "ML Service is running",
+        "model_loaded": bool(model_ready),
+        "model_load_error": model_load_error
+    })
 
-# 🔑 ENSURE MODEL HAS SYMBOLIC INPUT
-model.predict(np.zeros((1, 224, 224, 3)))
+# Note: model warm-up is performed in the background loader.
 
 # -------------------- RUN --------------------
 if __name__ == "__main__":
+    # Start background thread to load the ML model while the server binds immediately.
+    loader = threading.Thread(target=load_model_background, daemon=True)
+    loader.start()
+
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
