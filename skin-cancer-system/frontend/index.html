@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Skin Cancer Detection</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="container">
+    <h1>Skin Cancer Detection System</h1>
+    <p>Upload a skin lesion image for melanoma detection with AI-powered analysis</p>
+
+    <form id="uploadForm" class="upload-section" onsubmit="return false;">
+      <label for="imageInput" class="upload-btn">Choose Image</label>
+      <input type="file" id="imageInput" accept="image/*" />
+      <button id="predictBtn" type="button">Analyze Image</button>
+    </form>
+
+    <div class="result-section">
+      <h3 id="result"></h3>
+      <p id="error"></p>
+      <p id="clipStatus" style="font-weight:bold; color:#2e7d32;"></p>
+      <div id="stageSection" style="display:none; margin-top: 15px; padding: 15px; background-color: #f0f0f0; border-radius: 8px;">
+        <p style="margin: 0; font-weight: bold; color: #666;">Melanoma Stage</p>
+        <h3 id="stageLabel" style="margin: 10px 0 0 0; color: #d32f2f;"></h3>
+      </div>
+    </div>
+
+    <div class="images-section">
+      <div class="image-box">
+        <h3>📷 Original Image</h3>
+        <div class="image-placeholder" id="previewPlaceholder">No image selected</div>
+        <img id="previewImg" alt="Original upload" />
+      </div>
+      <div class="image-box">
+        <h3>🔥 Grad-CAM Heatmap</h3>
+        <div class="image-placeholder" id="gradcamPlaceholder">Waiting for analysis...</div>
+        <img id="gradcamImg" alt="Grad-CAM visualization" />
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
