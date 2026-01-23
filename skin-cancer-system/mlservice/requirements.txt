@@ -4,11 +4,6 @@ gunicorn
 numpy
 pillow
 opencv-python-headless
-tensorflow==2.20.0
-torch
-torchvision
-ftfy
-regex
-tqdm
+tensorflow-cpu
 git+https://github.com/openai/CLIP.git
 
