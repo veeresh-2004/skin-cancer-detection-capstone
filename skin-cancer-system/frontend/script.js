@@ -156,7 +156,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return false;
       }
 
-      result.innerText = `Prediction: ${data.label}\nConfidence: ${(data.confidence * 100).toFixed(2)}%`;
+      // Show both fraction (0-1) and percentage for clarity
+      const frac = (typeof data.confidence === 'number') ? data.confidence : (data.confidence_percent ? data.confidence_percent / 100 : null);
+      const pct = (typeof data.confidence_percent === 'number') ? data.confidence_percent : (frac !== null ? frac * 100 : null);
+      if (frac !== null && pct !== null) {
+        result.innerText = `Prediction: ${data.label}\nConfidence: ${frac.toFixed(4)} (${pct.toFixed(2)}%)`;
+      } else if (typeof data.confidence === 'number') {
+        result.innerText = `Prediction: ${data.label}\nConfidence: ${data.confidence}`;
+      } else {
+        result.innerText = `Prediction: ${data.label}`;
+      }
 
       if (data.clip_validation) {
         clipStatus.innerText = data.clip_validation;

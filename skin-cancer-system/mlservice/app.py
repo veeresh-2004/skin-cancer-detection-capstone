@@ -93,11 +93,18 @@ def predict():
        
         img_array = preprocess_image(image_path)
 
-        # Make prediction
-        score = model.predict(img_array)[0][0]
-        label = "The given image found as Melanoma" if score > 0.5 else "The given image found as Benign"
+        # Make prediction (model outputs probability of Melanoma)
+        score = float(model.predict(img_array)[0][0])
+        probs = {"melanoma": score, "benign": 1.0 - score}
 
-        print(f"✅ PREDICTION → {label} ({score:.4f})")
+        if score > 0.5:
+            label = "The given image found as Melanoma"
+            display_confidence = probs["melanoma"]
+        else:
+            label = "The given image found as Benign"
+            display_confidence = probs["benign"]
+
+        print(f"✅ PREDICTION → {label} (melanoma_prob={score:.4f})")
 
         # Generate Grad-CAM heatmap
         gradcam_base64 = None
@@ -133,7 +140,9 @@ def predict():
         # 🔹 STEP 3: MELANOMA STAGE (ONLY IF MELANOMA)
         response = {
             "label": label,
-            "confidence": float(score),
+            "confidence": float(display_confidence),
+            "confidence_percent": round(display_confidence * 100, 2),
+            "probabilities": probs,
             "gradcam_image": gradcam_base64,
             "clip_validation": clip_validation_msg
         }
