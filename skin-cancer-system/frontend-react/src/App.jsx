@@ -107,7 +107,7 @@ const GLOBAL_CSS = `
       display: none; /* hidden on desktop */
       position: absolute; left: 50%; transform: translateX(-50%) translateY(-6px) scale(.98);
       top: calc(100% + 8px);
-      background: rgba(255,255,255,.04); color: var(--vyo);
+      background: rgba(239, 231, 231, 0.96); color: var(--vyo);
       padding: 6px 10px; border-radius: 8px; font-size: .9rem;
       border: 1px solid rgba(255,255,255,.06);
       box-shadow: 0 6px 14px rgba(2,6,23,0.22);
@@ -524,7 +524,7 @@ const GLOBAL_CSS = `
   .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 18px; max-width: 980px; margin: 0 auto; }
   .team-member { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; }
   .team-avatar { width: 96px; height: 96px; border-radius: 999px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--navy),var(--teal)); color: #fff; font-weight: 800; font-size: 1.1rem; }
-  .team-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .team-avatar img { position: absolute; inset: 0; width: 100%; height: 121%; object-fit: cover; display: block; }
 
   @media (max-width: 720px) {
     .team-guide-card { padding: 14px; }
@@ -879,7 +879,7 @@ function Home({ goToDetection }) {
 
             {/* trust pills */}
             <div style={{ display: 'flex', gap: 8, marginTop: 28, flexWrap: 'wrap' }}>
-              {['🔒 Privacy-first', '⚡ Fast results', '📄 PDF Reports', '🧬 ISIC Dataset'].map(p => (
+              {['🔒 Privacy-first', '⚡ Fast results', '📄 PDF Reports', '🧬 HAM10000 Dataset'].map(p => (
                 <span key={p} style={{
                   background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)',
                   color: 'rgba(255,255,255,.6)', fontSize: '.73rem',
@@ -1387,7 +1387,7 @@ export default function App() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal-lt)', display: 'inline-block' }} /> System Overview
               </div>
               <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: 'clamp(1.6rem,3vw,2.4rem)', fontWeight: 700, color: 'var(--white)', lineHeight: 1.25, marginBottom: 14 }}>About <span style={{ color: 'var(--teal-lt)' }}>DermoDetection</span></h1>
-              <p style={{ color: 'var(--slate-lt)', fontSize: '1rem', lineHeight: 1.7 }}>A hybrid CNN + CLIP ensemble with Grad-CAM explainability for clinical-grade dermoscopic skin lesion classification. Built on the ISIC Archive — the world's largest public dermoscopy dataset.</p>
+              <p style={{ color: 'var(--slate-lt)', fontSize: '1rem', lineHeight: 1.7 }}>A hybrid CNN + CLIP ensemble with Grad-CAM explainability for clinical-grade dermoscopic skin lesion classification. Built on the HAM10000 Archive — the world's largest public dermoscopy dataset.</p>
             </div>
           </div>
 
@@ -1400,7 +1400,7 @@ export default function App() {
               {[
                 
                 ['🧬','Architecture','Combines an EfficientNet-based CNN for feature extraction with CLIPs cross-modal vision-language alignment. Grad-CAM generates pixel-level attribution maps.'],
-                ['📊','Dataset','Trained and evaluated on the ISIC Archive with 9,090 balanced images — 4,545 benign and 4,545 melanoma — augmented to prevent class imbalance.'],
+                ['📊','Dataset','Trained and evaluated on the HAM10000 Archive with 9,090 balanced images — 4,545 benign and 4,545 melanoma — augmented to prevent class imbalance.'],
                 ['🔐','Privacy','Images are processed server-side and deleted immediately after inference. No patient data is stored, logged, or retained.'],
                 ['📄','Reports','PDF reports include patient demographics, prediction result, confidence score, CLIP validation, Grad-CAM overlay, and a mandatory clinical disclaimer.'],
                 ['⚠️','Limitations','Model performs best on high-quality dermoscopic images. Results may degrade on standard smartphone photographs or images with poor lighting.'],
@@ -1463,7 +1463,7 @@ export default function App() {
 
             {/* ── Dataset Distribution ── */}
             <p className="section-title">Dataset Distribution</p>
-            <p className="section-sub">Balanced training set — 9,090 images total from the ISIC Archive.</p>
+            <p className="section-sub">Balanced training set — 9,090 images total from the HAM10000 Archive.</p>
             <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: 48 }}>
               {[['Benign', 4545, '#10b981'], ['Melanoma', 4545, '#ef4444']].map(([label, count, color]) => (
                 <div key={label} style={{ marginBottom: 18 }}>

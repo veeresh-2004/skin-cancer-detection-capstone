@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+.git/
+.gitignore
+*.log
+__pycache__/
+mlservice/uploads/
+mlservice/output_by_stage/
+frontend-react/node_modules/
