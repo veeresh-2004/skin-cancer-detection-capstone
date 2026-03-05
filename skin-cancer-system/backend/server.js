@@ -8,7 +8,7 @@ const path = require("path");
 
 const app = express();
 app.use(cors({
-  origin: ["http://127.0.0.1:5500", "http://127.0.0.1:3000", "http://localhost:5500", "http://localhost:3000"],
+  origin: ["http://127.0.0.1:5500", "http://127.0.0.1:3000", "http://localhost:5500", "http://localhost:3000", "http://localhost:5174"],
   credentials: true
 }));
 
@@ -65,7 +65,7 @@ app.post("/predict", upload.single("image"), async (req, res) => {
         if (err.code === 'ECONNREFUSED') {
             res.status(503).json({ error: "ML Service is not running. Please start the Python service." });
         } else {
-            res.status(500).json({ error: "Prediction failed: " + err.message });
+              res.status(500).json({ error: " ❌ Invalid Image ❌ || ✅ Please Select valid skin lesion ✅"  });
         }
     }
 });
