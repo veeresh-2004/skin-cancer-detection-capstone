@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { jsPDF } from 'jspdf'
-
+import DatasetDistributionChart from './DatasetDistributionChart'
+import AccuracyComparisonChart from './AccuracyComparisonChart'
+import CLIPPromptChart from './CLIPPromptChart'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/predict'
 
 // ── Inject global styles ──────────────────────────────────────────────────────
@@ -18,7 +20,7 @@ const GLOBAL_CSS = `
     --amber:     #f59e0b;
     --red:       #ef4444;
     --red-pale:  #fee2e2;
-    --slate:     #64748b;
+    --slate:     #000000;
     --slate-lt:  #94a3b8;
     --white:     #ffffff;
     --offwhite:  #f8fafc;
@@ -264,9 +266,11 @@ const GLOBAL_CSS = `
   @media(max-width:900px){ .detect-layout { grid-template-columns: 1fr; } }
 
   .form-card {
-    background: var(--white); border: 1px solid var(--border);
-    border-radius: var(--r-lg); padding: 28px;
-    box-shadow: var(--shadow-md);
+       background: #f0f4f8;
+    border: 1px solid #2a2d30;
+    border-radius: var(--r-lg);
+    padding: 28px;
+    box-shadow: 1px -10px 16px rgba(0, 0, 0, .1);
     animation: fadeUp .4s ease both;
   }
   .form-title {
@@ -281,7 +285,7 @@ const GLOBAL_CSS = `
   .field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
   .field label { font-size: .78rem; font-weight: 600; color: var(--slate); letter-spacing: .04em; text-transform: uppercase; }
   .field input, .field select {
-    padding: 9px 12px; border: 1.5px solid var(--border);
+    padding: 9px 12px; border:1.5px solid #3e4753;
     border-radius: var(--r-sm); font-family: 'DM Sans', sans-serif;
     font-size: .9rem; color: var(--navy);
     background: var(--offwhite);
@@ -306,7 +310,7 @@ const GLOBAL_CSS = `
   .sym-label input { display: none; }
 
   .upload-zone {
-    border: 2px dashed var(--border); border-radius: var(--r-md);
+    border: 2px dashed #181c20; border-radius: var(--r-md);
     padding: 24px; text-align: center; cursor: pointer;
     background: var(--offwhite); transition: border-color .2s, background .2s;
     margin-top: 4px;
@@ -389,7 +393,7 @@ const GLOBAL_CSS = `
   @media(max-width:560px){ .image-grid { grid-template-columns: 1fr; } }
 
   .img-box {
-    background: var(--white); border: 1px solid var(--border);
+    background: var(--white); border: 1px solid #1b1d1f;
     border-radius: var(--r-md); padding: 16px;
     box-shadow: var(--shadow-sm);
   }
@@ -518,12 +522,27 @@ const GLOBAL_CSS = `
 
   /* Team section styles */
   .team-guide-card {
-    max-width: 920px; margin: 0 auto; padding: 18px; display:flex; gap:14px; align-items:center; border-radius:14px;
-    background: var(--white); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
-  }
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 18px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    border-radius: 14px;
+    background: #e6e6e6;
+    border: 1px solid #000000;
+    box-shadow: var(--shadow-sm); }
   .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 18px; max-width: 980px; margin: 0 auto; }
-  .team-member { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; }
-  .team-avatar { width: 96px; height: 96px; border-radius: 999px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--navy),var(--teal)); color: #fff; font-weight: 800; font-size: 1.1rem; }
+  .team-member   {  display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    padding: 28px;
+    background: #ede7e7;
+    border: 2px solid #3e3c3c;
+    border-radius: 26px; 
+}.team-avatar {    width: 131px;
+    height: 155px; border-radius: 999px; position: relative; overflow: hidden; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--navy),var(--teal)); color: #fff; font-weight: 800; font-size: 1.1rem; }
   .team-avatar img { position: absolute; inset: 0; width: 100%; height: 121%; object-fit: cover; display: block; }
 
   @media (max-width: 720px) {
@@ -774,6 +793,7 @@ function NavBar({ route, setRoute }) {
 function Home({ goToDetection }) {
   const [counters, setCounters] = useState({ acc: 0, time: 0, classes: 0 })
   const [activeStep, setActiveStep] = useState(0)
+  const AUTO_STEP_MS = 5500 // slower step change (5.5s)
 
   useEffect(() => {
     const targets = { acc: 95, time: 3, classes: 7 }
@@ -794,7 +814,7 @@ function Home({ goToDetection }) {
   }, [])
 
   useEffect(() => {
-    const t = setInterval(() => setActiveStep(p => (p + 1) % 6), 2800)
+    const t = setInterval(() => setActiveStep(p => (p + 1) % 6), AUTO_STEP_MS)
     return () => clearInterval(t)
   }, [])
 
@@ -918,7 +938,7 @@ function Home({ goToDetection }) {
               >
                 {/* icon + label row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '.72rem', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>{label}</span>
+                  <span style={{ fontSize: '.72rem', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#ffffff' }}>{label}</span>
                   <div style={{
                     width: 32, height: 32, borderRadius: 8,
                     background: `${color}22`, border: `1px solid ${color}44`,
@@ -1015,7 +1035,7 @@ function Home({ goToDetection }) {
                   display: 'flex', alignItems: 'center', gap: 12,
                   borderLeft: `3px solid ${i === activeStep ? s.color : 'transparent'}`,
                   background: i === activeStep ? `${s.color}0f` : 'transparent',
-                  transition: 'all .25s',
+                  transition: 'all .10s',
                   borderBottom: i < steps.length - 1 ? '1px solid var(--border)' : 'none',
                 }}
                 onMouseEnter={e => { if (i !== activeStep) e.currentTarget.style.background = 'rgba(0,0,0,.03)' }}
@@ -1077,7 +1097,7 @@ function Home({ goToDetection }) {
                   width: i === activeStep ? 24 : 8,
                   height: 8, borderRadius: 99,
                   background: i === activeStep ? steps[activeStep].color : 'var(--border)',
-                  cursor: 'pointer', transition: 'all .3s',
+                  cursor: 'pointer', transition: 'all 1.0s',
                 }} />
               ))}
               <span style={{ marginLeft: 8, fontSize: '.72rem', color: 'var(--slate-lt)' }}>auto-advancing</span>
@@ -1465,17 +1485,7 @@ export default function App() {
             <p className="section-title">Dataset Distribution</p>
             <p className="section-sub">Balanced training set — 9,090 images total from the HAM10000 Archive.</p>
             <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: 48 }}>
-              {[['Benign', 4545, '#10b981'], ['Melanoma', 4545, '#ef4444']].map(([label, count, color]) => (
-                <div key={label} style={{ marginBottom: 18 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.85rem', fontWeight: 600, marginBottom: 6 }}>
-                    <span style={{ color: 'var(--navy)' }}>{label}</span>
-                    <span style={{ fontFamily: 'JetBrains Mono, monospace', color }}>{count.toLocaleString()} images — 50%</span>
-                  </div>
-                  <div style={{ height: 10, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: '50%', height: '100%', background: color, borderRadius: 99, transition: 'width .8s ease' }} />
-                  </div>
-                </div>
-              ))}
+              <DatasetDistributionChart />
               <p style={{ fontSize: '.8rem', color: 'var(--slate)', marginTop: 10 }}>Classes balanced via augmentation to prevent training bias toward majority class.</p>
             </div>
 
@@ -1513,59 +1523,11 @@ export default function App() {
               </table>
             </div>
 
-            {/* Bar chart comparison */}
-            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: 28 }}>
-              <div style={{ fontSize: '.8rem', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 20 }}>Accuracy Comparison — CNN vs CNN + CLIP</div>
-              {[
-                ['Overall Accuracy',   79, 87],
-                ['Precision',          81, 90],
-                ['Recall',             78, 88],
-                ['F1 Score',           79, 89],
-              ].map(([label, cnn, hybrid]) => (
-                <div key={label} style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: '.83rem', fontWeight: 600, color: 'var(--navy)', marginBottom: 6 }}>{label}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: '.72rem', color: 'var(--slate)', width: 72, textAlign: 'right' }}>CNN only</span>
-                      <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                        <div style={{ width: `${cnn}%`, height: '100%', background: '#94a3b8', borderRadius: 99 }} />
-                      </div>
-                      <span style={{ fontSize: '.78rem', fontFamily: 'JetBrains Mono, monospace', color: 'var(--slate)', width: 36 }}>{cnn}%</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: '.72rem', color: 'var(--teal)', width: 72, textAlign: 'right', fontWeight: 600 }}>CNN+CLIP</span>
-                      <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                        <div style={{ width: `${hybrid}%`, height: '100%', background: 'var(--teal)', borderRadius: 99 }} />
-                      </div>
-                      <span style={{ fontSize: '.78rem', fontFamily: 'JetBrains Mono, monospace', color: 'var(--teal)', fontWeight: 700, width: 36 }}>{hybrid}%</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Bar chart comparison */}
+<AccuracyComparisonChart />
 
-            {/* CLIP prompt scores */}
-            <p className="section-title" style={{ marginTop: 8 }}>CLIP Prompt Similarity Scores</p>
-            <p className="section-sub">Example output for a melanoma-positive sample — scores represent cosine similarity to each clinical prompt.</p>
-            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '28px', boxShadow: 'var(--shadow-sm)', marginBottom: 48 }}>
-              {[
-                ['Early stage melanoma',        0.73, '#ef4444'],
-                ['Intermediate stage melanoma', 0.35, '#f59e0b'],
-                ['Advanced stage melanoma',     0.12, '#f97316'],
-                ['Benign skin lesion',          0.24, '#10b981'],
-              ].map(([prompt, score, color]) => (
-                <div key={prompt} style={{ marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.85rem', marginBottom: 5 }}>
-                    <span style={{ color: 'var(--navy)', fontWeight: 500 }}>{`"${prompt}"`}</span>
-                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, color }}>{score.toFixed(2)}</span>
-                  </div>
-                  <div style={{ height: 9, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: `${score * 100}%`, height: '100%', background: color, borderRadius: 99, transition: 'width .9s ease' }} />
-                  </div>
-                </div>
-              ))}
-              <p style={{ fontSize: '.78rem', color: 'var(--slate)', marginTop: 12 }}>Highest score determines stage estimation shown in the prediction report.</p>
-            </div>
+{/* CLIP prompt scores */}
+<CLIPPromptChart />
 
             {/* Confusion matrix */}
             <p className="section-title">Confusion Matrix</p>
@@ -1611,8 +1573,17 @@ export default function App() {
           {/* Guide on first row */}
           <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
             <div className="team-guide-card">
-              <div style={{ width: 96, height: 96, borderRadius: 999, background: 'var(--offwhite)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.2rem' }} aria-hidden>
+              <div
+                className="team-avatar"
+                style={{ background: 'var(--offwhite)', color: 'var(--navy)', fontSize: '2.2rem' }}
+                aria-hidden
+              >
                 👩‍🏫
+                <img
+                  src="team/boosi_shyamala.jpg"
+                  alt="Mrs. Boosi Shyamala"
+                  onError={e => { e.currentTarget.style.display = 'none' }}
+                />
               </div>
               <div>
                 <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--navy)' }}>Mrs. Boosi Shyamala</div>
@@ -1625,12 +1596,12 @@ export default function App() {
           {/* Four members in a row (second row) */}
           <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <div className="team-grid">
-              {[
-                ['Team Leader', 'Veeresh Hedderi' ],
-                ['Team Associate', 'Kumar Guttal' ],
-                ['Team Member', 'RamKrishna'],
-                ['Team Member', 'Kushal C'],
-              ].map(([role, name, initial]) => {
+                {[
+                  ['Team Leader', 'Veeresh Hedderi' ,'BU22CSENO102281' , 'CSE-REGULAR'],
+                  ['Team Associate', 'Kumar Guttal' ,'BU22CSENO102282' , 'CSE-REGULAR'],
+                  ['Team Member', 'RamKrishna' ,'BU22CSENO102317' , 'CSE-REGULAR'],
+                  ['Team Member', 'Kushal C' ,'BU22CSENO102388' , 'CSE-REGULAR'],
+                ].map(([role, name, RegNo, dept]) => {
                 const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
                 return (
                   <div key={name} className="team-member">
@@ -1639,6 +1610,8 @@ export default function App() {
                     </div>
                     <div style={{ fontWeight: 700, color: 'var(--navy)', textAlign: 'center' }}>{name}</div>
                     <div style={{ fontSize: '.82rem', color: 'var(--slate)', textAlign: 'center' }}>{role}</div>
+                    <div style={{ fontSize: '.78rem', color: 'var(--slate)', textAlign: 'center' }}>{RegNo}</div>
+                    <div style={{ fontSize: '.78rem', color: 'var(--slate)', textAlign: 'center' }}>{dept}</div>
                   </div>
                 )
               })}
