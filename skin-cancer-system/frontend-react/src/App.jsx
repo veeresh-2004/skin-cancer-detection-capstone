@@ -458,11 +458,11 @@ const GLOBAL_CSS = `
   .about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
   .about-card {
     background: var(--white); border: 1px solid var(--border);
-    border-radius: var(--r-md); padding: 24px;
+    border-radius: var(--r-md); padding: 30px;
     box-shadow: var(--shadow-sm);
   }
-  .about-card h3 { font-family: 'Playfair Display', serif; font-size: 1rem; margin-bottom: 10px; color: var(--navy); }
-  .about-card p { font-size: .87rem; color: var(--slate); line-height: 1.65; }
+  .about-card h3 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 10px; color: var(--navy); }
+  .about-card p { font-size: 1rem; color: var(--slate); line-height: 1.65; }
 
   /* ── Footer ── */
   .footer {

@@ -11,3 +11,7 @@ __pycache__/
 mlservice/uploads/
 mlservice/output_by_stage/
 frontend-react/node_modules/
+models/
+output_by_stage/
+output_by_stage_malignant/
+output_by_stage_per_stage/

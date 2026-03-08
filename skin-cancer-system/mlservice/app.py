@@ -11,6 +11,9 @@ from clip_utils.clip_stage import estimate_melanoma_stage
 from flask_cors import CORS
 from gradcam.gradcam_utils import compute_gradcam, overlay_gradcam
 import threading
+import requests
+import tarfile
+import shutil
 
 import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
@@ -29,6 +32,34 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 print("🔵 Starting ML service...")
+
+# Optional: download model archive at startup if MODEL_URL is provided and model missing
+def download_and_extract_model(url):
+    try:
+        print(f"🔵 Downloading model from: {url}")
+        os.makedirs(os.path.join(BASE_DIR, "models"), exist_ok=True)
+        tmp_path = os.path.join(BASE_DIR, "models", "model_download.tmp")
+        with requests.get(url, stream=True, timeout=120) as r:
+            r.raise_for_status()
+            with open(tmp_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024*1024):
+                    if chunk:
+                        f.write(chunk)
+
+        # Try to extract as tar.gz
+        try:
+            with tarfile.open(tmp_path, "r:gz") as tar:
+                tar.extractall(path=os.path.join(BASE_DIR, "models"))
+            print("✅ Model archive extracted to models/")
+            os.remove(tmp_path)
+            return True
+        except tarfile.ReadError:
+            # Not a tarball — leave file as-is (user may have provided single files)
+            print("⚠️ Downloaded file is not a tar.gz archive; please ensure model files are placed under models/skin_cancer_cnn.keras/")
+            return False
+    except Exception as e:
+        print(f"❌ Failed to download model: {e}")
+        return False
 
 # Model globals (will be populated by background loader)
 model = None
@@ -169,19 +200,22 @@ def predict():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({
-        "status": "ML Service is running",
-        "model_loaded": bool(model_ready),
-        "model_load_error": model_load_error
-    })
+    return {"status": "ok"}
 
 # Note: model warm-up is performed in the background loader.
 
 # -------------------- RUN --------------------
 if __name__ == "__main__":
+    # If model weights are missing but MODEL_URL is provided, attempt to download and extract them.
+    model_url = os.environ.get("MODEL_URL")
+    if not os.path.exists(WEIGHTS_PATH) and model_url:
+        ok = download_and_extract_model(model_url)
+        if ok:
+            print("🔁 Retrying model load after download...")
+
     # Start background thread to load the ML model while the server binds immediately.
     loader = threading.Thread(target=load_model_background, daemon=True)
     loader.start()
 
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
