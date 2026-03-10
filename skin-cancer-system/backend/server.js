@@ -26,23 +26,42 @@ if (!fs.existsSync(uploadsDir)) {
 
 const upload = multer({ dest: "uploads/" });
 
-app.post("/predict", upload.single("image"), async (req, res) => {
+app.post("/predict", upload.any(), async (req, res) => {
+    const uploadedFiles = req.files || [];
+    const imageFiles = uploadedFiles.filter(
+        (f) => f.fieldname === "image" || f.fieldname === "images"
+    );
+
     try {
-        if (!req.file) {
+        if (!imageFiles.length) {
             return res.status(400).json({ error: "No image uploaded" });
         }
 
-        console.log("📤 Forwarding image to ML Service...");
+        console.log(`📤 Forwarding ${imageFiles.length} image(s) to ML Service...`);
 
         const form = new FormData();
-        form.append(
-            "image",
-            fs.createReadStream(req.file.path),
-            { filename: req.file.originalname }
-        );
+        let endpointPath = "/predict";
+
+        if (imageFiles.length > 1) {
+            endpointPath = "/predict-multiview";
+            imageFiles.forEach((file) => {
+                form.append("images", fs.createReadStream(file.path), {
+                    filename: file.originalname,
+                });
+            });
+
+            if (req.body && req.body.view_labels) {
+                form.append("view_labels", req.body.view_labels);
+            }
+        } else {
+            const [file] = imageFiles;
+            form.append("image", fs.createReadStream(file.path), {
+                filename: file.originalname,
+            });
+        }
 
         const response = await axios.post(
-            `${ML_SERVICE_URL}/predict`,
+            `${ML_SERVICE_URL}${endpointPath}`,
             form,
             { 
                 headers: form.getHeaders(),
@@ -50,25 +69,25 @@ app.post("/predict", upload.single("image"), async (req, res) => {
             }
         );
 
-        // Cleanup uploaded file
-        fs.unlinkSync(req.file.path);
-
         console.log("✅ Prediction received:", response.data.label);
         res.json(response.data);
 
     } catch (err) {
         console.error("❌ Backend Error:", err.message);
-        
-        // Cleanup file on error
-        if (req.file && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
 
         if (err.code === 'ECONNREFUSED') {
             res.status(503).json({ error: "ML Service is not running. Please start the Python service." });
+        } else if (err.response && err.response.data) {
+            res.status(err.response.status || 500).json(err.response.data);
         } else {
-              res.status(500).json({ error: " ❌ Invalid Image ❌ || ✅ Please Select valid skin lesion ✅"  });
+            res.status(500).json({ error: " ❌ Invalid Image ❌ || ✅ Please Select valid skin lesion ✅"  });
         }
+    } finally {
+        imageFiles.forEach((file) => {
+            if (file.path && fs.existsSync(file.path)) {
+                fs.unlinkSync(file.path);
+            }
+        });
     }
 });
 

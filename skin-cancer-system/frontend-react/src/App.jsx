@@ -1159,21 +1159,28 @@ export default function App() {
   const [route, setRoute] = useState('home')
 
   const fileInputRef = useRef(null)
+  const fileInputRef2 = useRef(null)
   const cameraVideoRef = useRef(null)
   const cameraCanvasRef = useRef(null)
   const streamRef = useRef(null)
   const [previewSrc, setPreviewSrc] = useState('')
+  const [previewSrc2, setPreviewSrc2] = useState('')
   const [selectedImageFile, setSelectedImageFile] = useState(null)
+  const [selectedImageFile2, setSelectedImageFile2] = useState(null)
   const [resultText, setResultText] = useState('')
   const [errorText, setErrorText] = useState('')
   const [clipStatus, setClipStatus] = useState('')
   const [stage, setStage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [gradcamSrc, setGradcamSrc] = useState('')
+  const [gradcamSrc2, setGradcamSrc2] = useState('')
   const [confidence, setConfidence] = useState(null)
   const [predLabel, setPredLabel] = useState('')
+  const [multiViewResults, setMultiViewResults] = useState([])
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState('')
+  const [viewLabel1, setViewLabel1] = useState('Front view')
+  const [viewLabel2, setViewLabel2] = useState('Side view')
 
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
@@ -1184,12 +1191,14 @@ export default function App() {
 
   function resetAnalysisOutputs() {
     setGradcamSrc('')
+    setGradcamSrc2('')
     setResultText('')
     setErrorText('')
     setClipStatus('')
     setStage(null)
     setConfidence(null)
     setPredLabel('')
+    setMultiViewResults([])
   }
 
   function stopCamera() {
@@ -1272,15 +1281,34 @@ export default function App() {
     reader.readAsDataURL(file)
   }
 
+  function handleFileChangeAngle2(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSelectedImageFile2(file)
+    const reader = new FileReader()
+    reader.onload = ev => {
+      setPreviewSrc2(ev.target.result)
+      resetAnalysisOutputs()
+    }
+    reader.readAsDataURL(file)
+  }
+
   function toggleSymptom(key) { setSymptoms(p => ({ ...p, [key]: !p[key] })) }
 
   async function handleAnalyzeClick() {
     const file = selectedImageFile || fileInputRef.current?.files?.[0]
-    if (!file) { setErrorText('Please select an image first.'); return }
-    setLoading(true); setResultText(''); setErrorText(''); setClipStatus(''); setStage(null); setGradcamSrc(''); setConfidence(null); setPredLabel('')
+    const file2 = selectedImageFile2 || fileInputRef2.current?.files?.[0]
+    if (!file) { setErrorText('Please select Angle 1 image first.'); return }
+    setLoading(true); setResultText(''); setErrorText(''); setClipStatus(''); setStage(null); setGradcamSrc(''); setGradcamSrc2(''); setConfidence(null); setPredLabel(''); setMultiViewResults([])
 
     const formData = new FormData()
-    formData.append('image', file)
+    if (file2) {
+      formData.append('images', file)
+      formData.append('images', file2)
+      formData.append('view_labels', JSON.stringify([viewLabel1 || 'Angle 1', viewLabel2 || 'Angle 2']))
+    } else {
+      formData.append('image', file)
+    }
     formData.append('name', name); formData.append('age', age); formData.append('gender', gender)
     formData.append('location', location); formData.append('duration', duration)
     formData.append('symptoms', JSON.stringify(symptoms))
@@ -1305,6 +1333,17 @@ export default function App() {
       setClipStatus(data.clip_validation || '')
       setStage(data.stage || null)
       if (data.gradcam_image) setGradcamSrc('data:image/png;base64,' + data.gradcam_image)
+
+      if (Array.isArray(data.views) && data.views.length > 0) {
+        setMultiViewResults(data.views)
+        const g1 = data.views[0]?.gradcam_image
+        const g2 = data.views[1]?.gradcam_image
+        setGradcamSrc(g1 ? `data:image/png;base64,${g1}` : '')
+        setGradcamSrc2(g2 ? `data:image/png;base64,${g2}` : '')
+      } else {
+        setMultiViewResults([])
+        setGradcamSrc2('')
+      }
     } catch (err) {
       setErrorText(`Error: ${err?.message || err}`)
     } finally {
@@ -1330,7 +1369,7 @@ export default function App() {
       {route === 'detection' && (
         <div className="section-wrap page-enter">
           <p className="section-title">Skin Lesion Analysis</p>
-          <p className="section-sub">Complete the patient form, upload a dermoscopic image, and receive an AI-powered assessment.</p>
+          <p className="section-sub">Complete the patient form, upload 1-2 angles of the same lesion, and receive a multi-view AI assessment.</p>
 
           <div className="detect-layout">
             {/* Form */}
@@ -1383,7 +1422,7 @@ export default function App() {
                 </div>
 
                 <div className="field">
-                  <label>Image Upload</label>
+                  <label>Lesion Image (Angle 1)</label>
                   <label htmlFor="imageInput" className="upload-zone">
                     {previewSrc
                       ? <img src={previewSrc} alt="preview" style={{ maxHeight: 120, borderRadius: 8, objectFit: 'contain' }} />
@@ -1443,8 +1482,34 @@ export default function App() {
                   <canvas ref={cameraCanvasRef} style={{ display: 'none' }} />
                 </div>
 
+                <div className="field">
+                  <label>Lesion Image (Angle 2 - Optional)</label>
+                  <label htmlFor="imageInput2" className="upload-zone">
+                    {previewSrc2
+                      ? <img src={previewSrc2} alt="preview-angle-2" style={{ maxHeight: 120, borderRadius: 8, objectFit: 'contain' }} />
+                      : (<><div className="upload-icon">📷</div><div className="upload-hint"><strong>Upload second angle</strong><br />Improves reliability with multi-view diagnosis</div></>)
+                    }
+                  </label>
+                  <input id="imageInput2" ref={fileInputRef2} type="file" accept="image/*" capture="environment" onChange={handleFileChangeAngle2} style={{ display: 'none' }} />
+                </div>
+
+                <div className="field-row">
+                  <div className="field">
+                    <label>Angle 1 Label</label>
+                    <select value={viewLabel1} onChange={e => setViewLabel1(e.target.value)}>
+                      {['Front view', 'Top view', 'Left side', 'Right side', 'Close-up'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Angle 2 Label</label>
+                    <select value={viewLabel2} onChange={e => setViewLabel2(e.target.value)}>
+                      {['Side view', 'Top view', 'Left side', 'Right side', 'Close-up'].map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </div>
+
                 <button className="btn-analyze" onClick={handleAnalyzeClick} disabled={loading}>
-                  {loading ? <><span className="spinner" /> Analyzing…</> : '▶ Analyze Image'}
+                  {loading ? <><span className="spinner" /> Analyzing…</> : '▶ Analyze Lesion'}
                 </button>
               </div>
             </div>
@@ -1467,7 +1532,7 @@ export default function App() {
               {/* Prediction */}
               {resultText && !loading && (
                 <div className="result-card">
-                  <div className="result-card-title">🧬 Prediction Result</div>
+                  <div className="result-card-title">🧬 Final Prediction Result</div>
                   <div className={`prediction-badge ${badgeClass}`}>
                     {badgeClass === 'badge-malignant' ? '⚠️' : badgeClass === 'badge-benign' ? '✅' : '🔍'} {predLabel || resultText}
                   </div>
@@ -1477,6 +1542,21 @@ export default function App() {
                       <div className="conf-bar-track"><div className="conf-bar-fill" style={{ width: `${Math.min(confidence, 100)}%` }} /></div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {multiViewResults.length > 0 && !loading && (
+                <div className="result-card">
+                  <div className="result-card-title">📌 Multi-View Breakdown</div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {multiViewResults.map((view, idx) => (
+                      <div key={`${view.view_label || 'angle'}-${idx}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', background: 'var(--offwhite)' }}>
+                        <div style={{ fontSize: '.84rem', fontWeight: 700, color: 'var(--navy)' }}>{view.view_label || `Angle ${idx + 1}`}</div>
+                        <div style={{ fontSize: '.85rem', color: 'var(--slate)', marginTop: 4 }}>{view.label}</div>
+                        <div style={{ fontSize: '.8rem', color: 'var(--teal)', marginTop: 3 }}>Confidence: {typeof view.confidence_percent === 'number' ? `${view.confidence_percent.toFixed(2)}%` : 'N/A'}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1497,17 +1577,31 @@ export default function App() {
               {/* Images */}
               <div className="image-grid">
                 <div className="img-box">
-                  <div className="img-box-title">📷 Original Image</div>
+                  <div className="img-box-title">📷 Angle 1 - Original</div>
                   {previewSrc
                     ? <img src={previewSrc} alt="Original" />
                     : <div className="img-placeholder"><span>📷</span>No image selected</div>
                   }
                 </div>
                 <div className="img-box">
-                  <div className="img-box-title">🔥 Grad-CAM Heatmap</div>
+                  <div className="img-box-title">🔥 Angle 1 - Grad-CAM</div>
                   {gradcamSrc
                     ? <img src={gradcamSrc} alt="Grad-CAM" />
                     : <div className="img-placeholder"><span>{loading ? '⏳' : '🔬'}</span>{loading ? 'Generating heatmap…' : 'Awaiting analysis'}</div>
+                  }
+                </div>
+                <div className="img-box">
+                  <div className="img-box-title">📷 Angle 2 - Original</div>
+                  {previewSrc2
+                    ? <img src={previewSrc2} alt="Original Angle 2" />
+                    : <div className="img-placeholder"><span>📷</span>No second angle selected</div>
+                  }
+                </div>
+                <div className="img-box">
+                  <div className="img-box-title">🔥 Angle 2 - Grad-CAM</div>
+                  {gradcamSrc2
+                    ? <img src={gradcamSrc2} alt="Grad-CAM Angle 2" />
+                    : <div className="img-placeholder"><span>{loading ? '⏳' : '🔬'}</span>{loading ? 'Generating heatmap…' : 'Awaiting multi-view analysis'}</div>
                   }
                 </div>
               </div>

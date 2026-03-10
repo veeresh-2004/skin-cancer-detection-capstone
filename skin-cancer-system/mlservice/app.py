@@ -14,6 +14,7 @@ import threading
 import requests
 import tarfile
 import shutil
+import uuid
 
 import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
@@ -97,9 +98,52 @@ def preprocess_image(image_path):
     arr = np.expand_dims(arr, axis=0)
     return arr
 
+def _find_last_conv_layer_name():
+    for i in range(len(model.layers) - 1, -1, -1):
+        if isinstance(model.layers[i], tf.keras.layers.Conv2D):
+            return model.layers[i].name
+    return None
+
+def _analyze_single_image(image_path, view_label=None):
+    if not is_skin_lesion(image_path):
+        raise ValueError("Uploaded image is not a skin lesion")
+
+    img_array = preprocess_image(image_path)
+    score = float(model.predict(img_array)[0][0])
+    probs = {"melanoma": score, "benign": 1.0 - score}
+
+    if score > 0.5:
+        label = "The given image found as Melanoma"
+        display_confidence = probs["melanoma"]
+    else:
+        label = "The given image found as Benign"
+        display_confidence = probs["benign"]
+
+    gradcam_base64 = None
+    try:
+        layer_name = _find_last_conv_layer_name()
+        if layer_name is not None:
+            heatmap = compute_gradcam(img_array, model, layer_name)
+            gradcam_overlay = overlay_gradcam(image_path, heatmap)
+            _, buffer = cv2.imencode('.png', gradcam_overlay)
+            gradcam_base64 = base64.b64encode(buffer).decode('utf-8')
+    except Exception as grad_err:
+        print(f"⚠️ Grad-CAM generation failed: {str(grad_err)}")
+
+    return {
+        "view_label": view_label,
+        "label": label,
+        "confidence": float(display_confidence),
+        "confidence_percent": round(display_confidence * 100, 2),
+        "probabilities": probs,
+        "gradcam_image": gradcam_base64,
+        "clip_validation": "Image validated as a skin lesion",
+    }
+
 # -------------------- API --------------------
 @app.route("/predict", methods=["POST"])
 def predict():
+    image_path = None
     try:
         if not model_ready:
             if model_load_error:
@@ -109,86 +153,27 @@ def predict():
             return jsonify({"error": "No image uploaded"}), 400
 
         file = request.files["image"]
-        image_path = os.path.join(UPLOAD_DIR, file.filename)
+        safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename)}"
+        image_path = os.path.join(UPLOAD_DIR, safe_name)
         file.save(image_path)
 
-        # 1️⃣ CLIP FILTER (ENFORCED)
-        if not is_skin_lesion(image_path):
-            print("🚫 CLIP filter rejected non-skin image")
-            return jsonify({
-                "error": "Uploaded image is not a skin lesion"
-            }), 400
-        else:
-            print("✅ CLIP filter passed - proceeding to CNN prediction")
-            clip_validation_msg = "Image validated as a skin lesion"
-       
-        img_array = preprocess_image(image_path)
-
-        # Make prediction (model outputs probability of Melanoma)
-        score = float(model.predict(img_array)[0][0])
-        probs = {"melanoma": score, "benign": 1.0 - score}
-
-        if score > 0.5:
-            label = "The given image found as Melanoma"
-            display_confidence = probs["melanoma"]
-        else:
-            label = "The given image found as Benign"
-            display_confidence = probs["benign"]
-
-        print(f"✅ PREDICTION → {label} (melanoma_prob={score:.4f})")
-
-        # Generate Grad-CAM heatmap
-        gradcam_base64 = None
         try:
-            # Find the last convolutional layer by index
-            last_conv_layer = None
-            for i in range(len(model.layers) - 1, -1, -1):
-                layer = model.layers[i]
-                if isinstance(layer, tf.keras.layers.Conv2D):
-                    last_conv_layer = i
-                    break
-            
-            if last_conv_layer is not None:
-                layer_name = model.layers[last_conv_layer].name
-                print(f"🔥 Generating Grad-CAM using layer: {layer_name} (index {last_conv_layer})")
-                heatmap = compute_gradcam(img_array, model, layer_name)
-                gradcam_overlay = overlay_gradcam(image_path, heatmap)
-                
-                # Encode Grad-CAM image to base64
-                _, buffer = cv2.imencode('.png', gradcam_overlay)
-                gradcam_base64 = base64.b64encode(buffer).decode('utf-8')
-                
-                print("✅ Grad-CAM generated successfully")
-            else:
-                print("⚠️ No Conv2D layer found for Grad-CAM")
-                gradcam_base64 = None
-        except Exception as grad_err:
-            print(f"⚠️ Grad-CAM generation failed: {str(grad_err)}")
-            import traceback
-            traceback.print_exc()
-            gradcam_base64 = None
+            result = _analyze_single_image(image_path)
+        except ValueError as ve:
+            print("🚫 CLIP filter rejected non-skin image")
+            return jsonify({"error": str(ve)}), 400
 
-        # 🔹 STEP 3: MELANOMA STAGE (ONLY IF MELANOMA)
-        response = {
-            "label": label,
-            "confidence": float(display_confidence),
-            "confidence_percent": round(display_confidence * 100, 2),
-            "probabilities": probs,
-            "gradcam_image": gradcam_base64,
-            "clip_validation": clip_validation_msg
-        }
+        response = dict(result)
+        score = result["probabilities"]["melanoma"]
+        print(f"✅ PREDICTION → {result['label']} (melanoma_prob={score:.4f})")
 
-        if "Melanoma" in label:
+        if "Melanoma" in result["label"]:
             try:
                 stage = estimate_melanoma_stage(image_path)
                 response["stage"] = stage
                 print(f"🎭 CLIP-estimated melanoma stage: {stage}")
             except Exception as stage_err:
                 print(f"⚠️ Stage estimation failed: {stage_err}")
-
-        # Clean up uploaded file
-        if os.path.exists(image_path):
-            os.remove(image_path)
 
         return jsonify(response)
 
@@ -197,6 +182,118 @@ def predict():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+    finally:
+        if image_path and os.path.exists(image_path):
+            os.remove(image_path)
+
+@app.route("/predict-multiview", methods=["POST"])
+def predict_multiview():
+    saved_paths = []
+    try:
+        if not model_ready:
+            if model_load_error:
+                return jsonify({"error": "Model failed to load", "details": model_load_error}), 500
+            return jsonify({"error": "Model is still loading, try again shortly"}), 503
+
+        files = request.files.getlist("images")
+        if not files and "image" in request.files:
+            files = [request.files["image"]]
+        if not files:
+            return jsonify({"error": "No images uploaded"}), 400
+
+        view_labels = []
+        raw_labels = request.form.get("view_labels")
+        if raw_labels:
+            try:
+                parsed = json.loads(raw_labels)
+                if isinstance(parsed, list):
+                    view_labels = [str(v) for v in parsed]
+            except Exception:
+                view_labels = []
+
+        per_view = []
+        stage_candidate = None
+        for idx, file in enumerate(files):
+            safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename)}"
+            image_path = os.path.join(UPLOAD_DIR, safe_name)
+            file.save(image_path)
+            saved_paths.append(image_path)
+
+            view_label = view_labels[idx] if idx < len(view_labels) else f"Angle {idx + 1}"
+            try:
+                result = _analyze_single_image(image_path, view_label=view_label)
+            except ValueError as ve:
+                return jsonify({"error": f"{view_label}: {str(ve)}"}), 400
+
+            melanoma_prob = result["probabilities"]["melanoma"]
+            certainty_weight = max(melanoma_prob, 1.0 - melanoma_prob)
+
+            per_view.append({
+                "index": idx + 1,
+                "weight": float(certainty_weight),
+                **result,
+            })
+
+            if stage_candidate is None or melanoma_prob > stage_candidate["melanoma_prob"]:
+                stage_candidate = {"melanoma_prob": melanoma_prob, "image_path": image_path}
+
+        weights = [item["weight"] for item in per_view]
+        scores = [item["probabilities"]["melanoma"] for item in per_view]
+        weight_sum = float(sum(weights))
+        if weight_sum > 0:
+            final_melanoma_score = float(sum(s * w for s, w in zip(scores, weights)) / weight_sum)
+        else:
+            final_melanoma_score = float(np.mean(scores))
+
+        final_probs = {
+            "melanoma": final_melanoma_score,
+            "benign": 1.0 - final_melanoma_score,
+        }
+
+        if final_melanoma_score > 0.5:
+            label = "The given lesion found as Melanoma (Multi-view)"
+            display_confidence = final_probs["melanoma"]
+        else:
+            label = "The given lesion found as Benign (Multi-view)"
+            display_confidence = final_probs["benign"]
+
+        response = {
+            "label": label,
+            "confidence": float(display_confidence),
+            "confidence_percent": round(display_confidence * 100, 2),
+            "probabilities": final_probs,
+            "clip_validation": "All uploaded views validated as skin lesions",
+            "views": per_view,
+            "view_count": len(per_view),
+            "aggregation": {
+                "method": "weighted_average_by_confidence",
+                "weights": weights,
+                "raw_melanoma_scores": scores,
+            },
+            "ai_explanation": "Final diagnosis is computed by aggregating multiple lesion views with confidence-based weighting.",
+            "gradcam_image": per_view[0]["gradcam_image"] if per_view else None,
+        }
+
+        if per_view and len(per_view) > 1:
+            response["gradcam_images"] = [item["gradcam_image"] for item in per_view]
+
+        if "Melanoma" in label and stage_candidate is not None:
+            try:
+                response["stage"] = estimate_melanoma_stage(stage_candidate["image_path"])
+            except Exception as stage_err:
+                print(f"⚠️ Stage estimation failed: {stage_err}")
+
+        return jsonify(response)
+
+    except Exception as e:
+        print("❌ ML SERVICE MULTI-VIEW ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        for image_path in saved_paths:
+            if image_path and os.path.exists(image_path):
+                os.remove(image_path)
 
 @app.route("/health", methods=["GET"])
 def health():
