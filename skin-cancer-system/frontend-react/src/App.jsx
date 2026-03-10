@@ -1159,7 +1159,11 @@ export default function App() {
   const [route, setRoute] = useState('home')
 
   const fileInputRef = useRef(null)
+  const cameraVideoRef = useRef(null)
+  const cameraCanvasRef = useRef(null)
+  const streamRef = useRef(null)
   const [previewSrc, setPreviewSrc] = useState('')
+  const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [resultText, setResultText] = useState('')
   const [errorText, setErrorText] = useState('')
   const [clipStatus, setClipStatus] = useState('')
@@ -1168,6 +1172,8 @@ export default function App() {
   const [gradcamSrc, setGradcamSrc] = useState('')
   const [confidence, setConfidence] = useState(null)
   const [predLabel, setPredLabel] = useState('')
+  const [cameraActive, setCameraActive] = useState(false)
+  const [cameraError, setCameraError] = useState('')
 
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
@@ -1176,13 +1182,92 @@ export default function App() {
   const [duration, setDuration] = useState('Less than 1 month')
   const [symptoms, setSymptoms] = useState({ itching: false, bleeding: false, pain: false, rapid_growth: false, color_change: false })
 
+  function resetAnalysisOutputs() {
+    setGradcamSrc('')
+    setResultText('')
+    setErrorText('')
+    setClipStatus('')
+    setStage(null)
+    setConfidence(null)
+    setPredLabel('')
+  }
+
+  function stopCamera() {
+    const stream = streamRef.current
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    setCameraActive(false)
+  }
+
+  useEffect(() => {
+    return () => stopCamera()
+  }, [])
+
+  useEffect(() => {
+    if (route !== 'detection' && cameraActive) stopCamera()
+  }, [route, cameraActive])
+
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera is not supported in this browser.')
+      return
+    }
+    setCameraError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+      streamRef.current = stream
+      setCameraActive(true)
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) cameraVideoRef.current.srcObject = stream
+      })
+    } catch (err) {
+      setCameraError(`Unable to access camera: ${err?.message || err}`)
+    }
+  }
+
+  function captureFromCamera() {
+    const video = cameraVideoRef.current
+    const canvas = cameraCanvasRef.current
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError('Camera stream not ready yet. Please try again.')
+      return
+    }
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    canvas.toBlob(blob => {
+      if (!blob) {
+        setCameraError('Failed to capture image from camera.')
+        return
+      }
+      const capturedFile = new File([blob], `captured-lesion-${Date.now()}.jpg`, { type: 'image/jpeg' })
+      setSelectedImageFile(capturedFile)
+      setPreviewSrc(canvas.toDataURL('image/jpeg', 0.95))
+      resetAnalysisOutputs()
+      setCameraError('')
+      stopCamera()
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }, 'image/jpeg', 0.95)
+  }
+
   function handleFileChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    setSelectedImageFile(file)
+    stopCamera()
+    setCameraError('')
     const reader = new FileReader()
     reader.onload = ev => {
       setPreviewSrc(ev.target.result)
-      setGradcamSrc(''); setResultText(''); setErrorText(''); setClipStatus(''); setStage(null); setConfidence(null); setPredLabel('')
+      resetAnalysisOutputs()
     }
     reader.readAsDataURL(file)
   }
@@ -1190,7 +1275,7 @@ export default function App() {
   function toggleSymptom(key) { setSymptoms(p => ({ ...p, [key]: !p[key] })) }
 
   async function handleAnalyzeClick() {
-    const file = fileInputRef.current?.files?.[0]
+    const file = selectedImageFile || fileInputRef.current?.files?.[0]
     if (!file) { setErrorText('Please select an image first.'); return }
     setLoading(true); setResultText(''); setErrorText(''); setClipStatus(''); setStage(null); setGradcamSrc(''); setConfidence(null); setPredLabel('')
 
@@ -1305,7 +1390,57 @@ export default function App() {
                       : (<><div className="upload-icon">🔬</div><div className="upload-hint"><strong>Click to upload</strong> or drag and drop<br />JPEG, PNG, TIFF supported</div></>)
                     }
                   </label>
-                  <input id="imageInput" ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+                  <input id="imageInput" ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} style={{ display: 'none' }} />
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    {!cameraActive && (
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        onClick={startCamera}
+                        style={{ padding: '8px 12px', color: 'var(--navy)', borderColor: 'black' }}
+                      >
+                        Upload from Camera
+                      </button>
+                    )}
+                    {cameraActive && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={captureFromCamera}
+                          style={{ padding: '8px 12px' }}
+                        >
+                          Capture Photo
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          onClick={stopCamera}
+                          style={{ padding: '8px 12px', color: 'var(--navy)', borderColor: 'black' }}
+                        >
+                          Close Camera
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {cameraError && (
+                    <div style={{ marginTop: 8, color: '#991b1b', fontSize: '.8rem' }}>{cameraError}</div>
+                  )}
+
+                  {cameraActive && (
+                    <div style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: '#000' }}>
+                      <video
+                        ref={cameraVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block' }}
+                      />
+                    </div>
+                  )}
+                  <canvas ref={cameraCanvasRef} style={{ display: 'none' }} />
                 </div>
 
                 <button className="btn-analyze" onClick={handleAnalyzeClick} disabled={loading}>

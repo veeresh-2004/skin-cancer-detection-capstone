@@ -7,6 +7,8 @@ const cors = require("cors");
 const path = require("path");
 
 const app = express();
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:10000";
+
 app.use(cors({
   origin: ["http://127.0.0.1:5500", "http://127.0.0.1:3000", "http://localhost:5500", "http://localhost:3000", "http://localhost:5174"],
   credentials: true
@@ -40,7 +42,7 @@ app.post("/predict", upload.single("image"), async (req, res) => {
         );
 
         const response = await axios.post(
-            "http://127.0.0.1:5000/predict",
+            `${ML_SERVICE_URL}/predict`,
             form,
             { 
                 headers: form.getHeaders(),
@@ -81,5 +83,6 @@ app.get("/", (req, res) => {
 
 app.listen(3000, () => {
     console.log("🚀 Node backend running on http://127.0.0.1:3000");
+    console.log(`🤖 ML Service target: ${ML_SERVICE_URL}`);
     console.log("💡 Waiting for requests from frontend...");
 });
