@@ -5,6 +5,7 @@ import AccuracyComparisonChart from './AccuracyComparisonChart'
 import CLIPPromptChart from './CLIPPromptChart'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '/predict'
 
+
 // ── Inject global styles ──────────────────────────────────────────────────────
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=Playfair+Display:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -574,11 +575,12 @@ function getBadgeClass(label) {
 }
 
 // ── PDF generation ────────────────────────────────────────────────────────────
-function generatePDF({ name, age, gender, location, duration, symptoms, resultText, clipStatus, stage, previewSrc, gradcamSrc }) {
+function generatePDF({ name, age, gender, location, duration, symptoms, resultText, clipStatus, stage, previewSrc, gradcamSrc, previewSrc2, gradcamSrc2, viewLabel1, viewLabel2 }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const W = doc.internal.pageSize.getWidth()
   const H = doc.internal.pageSize.getHeight()
   const margin = 48
+  const hasMultiView = !!(previewSrc2 && gradcamSrc2)
 
   // ── Header bar ──
   doc.setFillColor(10, 22, 40)
@@ -712,28 +714,70 @@ function generatePDF({ name, age, gender, location, duration, symptoms, resultTe
   }
 
   // ── Images ──
-  const imgW = (W - margin * 2 - 20) / 2
-  const imgH = 180
-  const imgY = y + 10
+  if (hasMultiView) {
+    // Multi-view: Show 4 images in 2x2 grid
+    const imgW = (W - margin * 2 - 20) / 2
+    const imgH = 140
+    const imgY = y + 10
 
-  doc.setTextColor(100, 116, 139)
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'bold')
-  doc.text('ORIGINAL IMAGE', margin, imgY - 8)
-  doc.text('GRAD-CAM HEATMAP', margin + imgW + 20, imgY - 8)
+    doc.setTextColor(100, 116, 139)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text(viewLabel1 || 'View 1', margin, imgY - 8)
+    doc.text('GRAD-CAM', margin + imgW + 20, imgY - 8)
+    doc.text(viewLabel2 || 'View 2', margin, imgY + imgH + 10)
+    doc.text('GRAD-CAM', margin + imgW + 20, imgY + imgH + 10)
 
-  doc.setDrawColor(226, 232, 240)
-  doc.roundedRect(margin, imgY, imgW, imgH, 6, 6, 'S')
-  doc.roundedRect(margin + imgW + 20, imgY, imgW, imgH, 6, 6, 'S')
+    // View 1 boxes
+    doc.setDrawColor(226, 232, 240)
+    doc.roundedRect(margin, imgY, imgW, imgH, 6, 6, 'S')
+    doc.roundedRect(margin + imgW + 20, imgY, imgW, imgH, 6, 6, 'S')
 
-  if (previewSrc) {
-    try { doc.addImage(previewSrc, 'JPEG', margin + 2, imgY + 2, imgW - 4, imgH - 4) }
-    catch { try { doc.addImage(previewSrc, 'PNG', margin + 2, imgY + 2, imgW - 4, imgH - 4) } catch {} }
+    // View 2 boxes
+    doc.roundedRect(margin, imgY + imgH + 18, imgW, imgH, 6, 6, 'S')
+    doc.roundedRect(margin + imgW + 20, imgY + imgH + 18, imgW, imgH, 6, 6, 'S')
+
+    // Add images
+    if (previewSrc) {
+      try { doc.addImage(previewSrc, 'JPEG', margin + 2, imgY + 2, imgW - 4, imgH - 4) }
+      catch { try { doc.addImage(previewSrc, 'PNG', margin + 2, imgY + 2, imgW - 4, imgH - 4) } catch {} }
+    }
+    if (gradcamSrc) {
+      try { doc.addImage(gradcamSrc, 'PNG', margin + imgW + 22, imgY + 2, imgW - 4, imgH - 4) } catch {}
+    }
+    if (previewSrc2) {
+      try { doc.addImage(previewSrc2, 'JPEG', margin + 2, imgY + imgH + 20, imgW - 4, imgH - 4) }
+      catch { try { doc.addImage(previewSrc2, 'PNG', margin + 2, imgY + imgH + 20, imgW - 4, imgH - 4) } catch {} }
+    }
+    if (gradcamSrc2) {
+      try { doc.addImage(gradcamSrc2, 'PNG', margin + imgW + 22, imgY + imgH + 20, imgW - 4, imgH - 4) } catch {}
+    }
+    y = imgY + imgH * 2 + 45
+  } else {
+    // Single view: Show 2 images side by side
+    const imgW = (W - margin * 2 - 20) / 2
+    const imgH = 180
+    const imgY = y + 10
+
+    doc.setTextColor(100, 116, 139)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.text('ORIGINAL IMAGE', margin, imgY - 8)
+    doc.text('GRAD-CAM HEATMAP', margin + imgW + 20, imgY - 8)
+
+    doc.setDrawColor(226, 232, 240)
+    doc.roundedRect(margin, imgY, imgW, imgH, 6, 6, 'S')
+    doc.roundedRect(margin + imgW + 20, imgY, imgW, imgH, 6, 6, 'S')
+
+    if (previewSrc) {
+      try { doc.addImage(previewSrc, 'JPEG', margin + 2, imgY + 2, imgW - 4, imgH - 4) }
+      catch { try { doc.addImage(previewSrc, 'PNG', margin + 2, imgY + 2, imgW - 4, imgH - 4) } catch {} }
+    }
+    if (gradcamSrc) {
+      try { doc.addImage(gradcamSrc, 'PNG', margin + imgW + 22, imgY + 2, imgW - 4, imgH - 4) } catch {}
+    }
+    y = imgY + imgH + 28
   }
-  if (gradcamSrc) {
-    try { doc.addImage(gradcamSrc, 'PNG', margin + imgW + 22, imgY + 2, imgW - 4, imgH - 4) } catch {}
-  }
-  y = imgY + imgH + 28
 
   // ── Disclaimer ──
   doc.setFillColor(255, 251, 235)
@@ -1179,6 +1223,7 @@ export default function App() {
   const [multiViewResults, setMultiViewResults] = useState([])
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState('')
+  const [cameraTarget, setCameraTarget] = useState('angle1')
   const [viewLabel1, setViewLabel1] = useState('Front view')
   const [viewLabel2, setViewLabel2] = useState('Side view')
 
@@ -1208,6 +1253,7 @@ export default function App() {
       streamRef.current = null
     }
     setCameraActive(false)
+    setCameraTarget('angle1')
   }
 
   useEffect(() => {
@@ -1218,12 +1264,20 @@ export default function App() {
     if (route !== 'detection' && cameraActive) stopCamera()
   }, [route, cameraActive])
 
-  async function startCamera() {
+  async function startCamera(target = 'angle1') {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError('Camera is not supported in this browser.')
       return
     }
     setCameraError('')
+    setCameraTarget(target)
+    if (streamRef.current) {
+      setCameraActive(true)
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) cameraVideoRef.current.srcObject = streamRef.current
+      })
+      return
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
@@ -1258,12 +1312,19 @@ export default function App() {
         return
       }
       const capturedFile = new File([blob], `captured-lesion-${Date.now()}.jpg`, { type: 'image/jpeg' })
-      setSelectedImageFile(capturedFile)
-      setPreviewSrc(canvas.toDataURL('image/jpeg', 0.95))
+      const capturedPreview = canvas.toDataURL('image/jpeg', 0.95)
+      if (cameraTarget === 'angle2') {
+        setSelectedImageFile2(capturedFile)
+        setPreviewSrc2(capturedPreview)
+        if (fileInputRef2.current) fileInputRef2.current.value = ''
+      } else {
+        setSelectedImageFile(capturedFile)
+        setPreviewSrc(capturedPreview)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
       resetAnalysisOutputs()
       setCameraError('')
       stopCamera()
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }, 'image/jpeg', 0.95)
   }
 
@@ -1285,6 +1346,8 @@ export default function App() {
     const file = e.target.files?.[0]
     if (!file) return
     setSelectedImageFile2(file)
+    stopCamera()
+    setCameraError('')
     const reader = new FileReader()
     reader.onload = ev => {
       setPreviewSrc2(ev.target.result)
@@ -1352,7 +1415,7 @@ export default function App() {
   }
 
   function handleDownloadReport() {
-    generatePDF({ name, age, gender, location, duration, symptoms, resultText, clipStatus, stage, previewSrc, gradcamSrc })
+    generatePDF({ name, age, gender, location, duration, symptoms, resultText, clipStatus, stage, previewSrc, gradcamSrc, previewSrc2, gradcamSrc2, viewLabel1, viewLabel2 })
   }
 
   const badgeClass = getBadgeClass(predLabel)
@@ -1625,6 +1688,7 @@ export default function App() {
         </div>
       )}
 
+      
       {/* ── ABOUT ── */}
       {route === 'about' && (
         <div className="page-enter">
@@ -1800,7 +1864,7 @@ export default function App() {
           <p className="section-sub">Project guide and team contacts</p>
 
           {/* Guide on first row */}
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+          {/* <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
             <div className="team-guide-card">
               <div
                 className="team-avatar"
@@ -1820,7 +1884,7 @@ export default function App() {
                 <div style={{ fontSize: '.85rem', color: 'var(--slate)', marginTop: 8 }}>Gitam School</div>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Four members in a row (second row) */}
           <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -1857,15 +1921,15 @@ export default function App() {
           </div>
 
           <div style={{ flex: '1 1 520px', maxWidth: 920 }}>
-            <h2 style={{ margin: '0 0 6px 0' }}>Skin Cancer Detection From Dermoscopic Images · Capstone Project</h2>
-            <div style={{ fontSize: '.95rem', color: 'var(--slate)', lineHeight: 1.5 }}>
+            {/* <h2 style={{ margin: '0 0 6px 0' }}>Skin Cancer Detection From Dermoscopic Images · Capstone Project</h2> */}
+            <div style={{ fontSize: '.95rem', color: 'white', lineHeight: 1.5 }}>
               <strong>Team Details:</strong>
               <div>Team Leader: Veeresh Hedderi</div>
               <div>Team Associate: Kumar Guttal</div>
               <div>Team Member: RamKrishna</div>
               <div>Team Member: Kushal C</div>
-              <div>Guided by: Mrs. Boosi Shaymaloa — Assistant Professor, Dept. of CSE</div>
-              <div>Gitam School</div>
+              {/* <div>Guided by: Mrs. Boosi Shaymaloa — Assistant Professor, Dept. of CSE</div>
+              <div>Gitam School</div> */}
             </div>
           </div>
 

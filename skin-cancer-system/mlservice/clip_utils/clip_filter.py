@@ -1,10 +1,7 @@
 import clip
 import torch
 from PIL import Image
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-B/32", device=device)
-
+from clip_utils._clip_model import get_clip_model, device
 
 
 MEDICAL_SKIN = [
@@ -33,6 +30,7 @@ NON_SKIN = [
 ]
 
 def is_skin_lesion(image_path, min_margin=0.05, min_medical_score=0.10):
+    model, preprocess = get_clip_model()
     image = preprocess(Image.open(image_path).convert("RGB")).unsqueeze(0).to(device)
     texts = MEDICAL_SKIN + NORMAL_SKIN + NON_SKIN
     text_tokens = clip.tokenize(texts).to(device)

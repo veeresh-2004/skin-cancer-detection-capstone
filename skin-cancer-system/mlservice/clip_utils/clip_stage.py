@@ -1,9 +1,7 @@
 import clip
 import torch
 from PIL import Image
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-B/32", device=device)
+from clip_utils._clip_model import get_clip_model, device
 
 STAGE_PROMPTS = {
     "Stage 0 (In situ : a very early melanoma confined to the epidermis)": "a very early melanoma confined to the epidermis",
@@ -14,6 +12,7 @@ STAGE_PROMPTS = {
 }
 
 def estimate_melanoma_stage(image_path):
+    model, preprocess = get_clip_model()
     image = preprocess(Image.open(image_path).convert("RGB")).unsqueeze(0).to(device)
     text = clip.tokenize(list(STAGE_PROMPTS.values())).to(device)
 
