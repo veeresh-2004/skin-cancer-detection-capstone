@@ -10,7 +10,7 @@ const app = express();
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:10000";
 
 app.use(cors({
-  origin: ["http://127.0.0.1:5500", "http://127.0.0.1:3000", "http://localhost:5500", "http://localhost:3000", "http://localhost:5174"],
+  origin: ["http://127.0.0.1:5500", "http://127.0.0.1:3000", "http://localhost:5500", "http://localhost:3000", "http://localhost:5174","https://t0mdkbcw-5173.inc1.devtunnels.ms/"],
   credentials: true
 }));
 

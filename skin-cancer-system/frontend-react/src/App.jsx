@@ -1860,7 +1860,8 @@ export default function App() {
 
       {route === 'team' && (
         <div className="section-wrap page-enter" id="team">
-          <p className="section-title">Contact Us — Team</p>
+          <p className="section-title">Contact Us — Team No-31  </p>
+          <p className="section-title">  Team Name : Code4Care </p>
           <p className="section-sub">Project guide and team contacts</p>
 
           {/* Guide on first row */}
